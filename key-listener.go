@@ -8,13 +8,19 @@ import (
 	"net/http"
 )
 
+//FilePath - The file path to read and write too
+const FilePath = "currentKeys.json"
+
+//ListenPort - The port the the server will listen on
+const ListenPort = ":33000"
+
 func main() {
 
 	http.Handle("/pickUpKeys", bodyCloser(http.HandlerFunc(determineRoute)))
 
 	http.Handle("/dropOffKeys", bodyCloser(http.HandlerFunc(determineRoute)))
 
-	log.Fatal(http.ListenAndServe(":33000", nil))
+	log.Fatal(http.ListenAndServe(ListenPort, nil))
 
 }
 
@@ -48,16 +54,23 @@ func recordKeys(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	rankingsJSON, _ := json.Marshal(t)
-	err = ioutil.WriteFile("currentKeys.json", rankingsJSON, 0644)
+	err = ioutil.WriteFile(FilePath, rankingsJSON, 0644)
+	if err != nil {
+		fmt.Println(err.Error())
+	} else {
+		rw.WriteHeader(http.StatusAccepted)
+	}
+
 }
 
 func printKeys(w http.ResponseWriter, r *http.Request) {
-	raw, err := ioutil.ReadFile("currentKeys.json")
+	raw, err := ioutil.ReadFile(FilePath)
 
 	if err != nil {
 		fmt.Println(err.Error())
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	w.Write(raw)
 
 }
