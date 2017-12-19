@@ -6,23 +6,35 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"os"
 )
 
 func main() {
-	http.HandleFunc("/pickUpKeys", func(w http.ResponseWriter, r *http.Request) {
-		//fmt.Fprintf(w, "Hello, %q", html.EscapeString(r.URL.Path))
-		//printKeys(w, r)
-		printKeys(w, r)
-	})
 
-	http.HandleFunc("/dropOffKeys", func(w http.ResponseWriter, r *http.Request) {
-		//recordKeys(r, "currentKeys.json")
-		recordKeys(w, r)
+	http.Handle("/pickUpKeys", bodyCloser(http.HandlerFunc(determineRoute)))
 
-	})
+	http.Handle("/dropOffKeys", bodyCloser(http.HandlerFunc(determineRoute)))
 
 	log.Fatal(http.ListenAndServe(":33000", nil))
+
+}
+
+func bodyCloser(handler http.Handler) http.Handler {
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		handler.ServeHTTP(w, r)
+	})
+
+}
+
+func determineRoute(rw http.ResponseWriter, req *http.Request) {
+
+	switch req.Method {
+	case "POST":
+		recordKeys(rw, req)
+	case "GET":
+		printKeys(rw, req)
+	}
 
 }
 
@@ -30,24 +42,13 @@ func recordKeys(rw http.ResponseWriter, req *http.Request) {
 	decoder := json.NewDecoder(req.Body)
 	var t Passwords
 	err := decoder.Decode(&t)
-	if err != nil {
-		panic(err)
-	}
-	defer req.Body.Close()
 
-	rankingsJSON, _ := json.Marshal(t)
-	err = ioutil.WriteFile("currentKeys.json", rankingsJSON, 0644)
-}
-
-func printKeysOld(w http.ResponseWriter, r *http.Request) {
-
-	todaysPasswords, err := ioutil.ReadFile("currentKeys.json")
 	if err != nil {
 		fmt.Println(err.Error())
 	}
 
-	fmt.Fprintf(w, "%q", todaysPasswords)
-
+	rankingsJSON, _ := json.Marshal(t)
+	err = ioutil.WriteFile("currentKeys.json", rankingsJSON, 0644)
 }
 
 func printKeys(w http.ResponseWriter, r *http.Request) {
@@ -55,11 +56,8 @@ func printKeys(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		fmt.Println(err.Error())
-		os.Exit(1)
 	}
 
-	//var currentPassword Passwords
-	//json.Unmarshal(raw, &currentPassword)
 	w.Write(raw)
 
 }
